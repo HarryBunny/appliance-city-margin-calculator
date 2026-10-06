@@ -62,6 +62,18 @@
           <div class="status" id="status">Your current cost is £12.50 above this target.</div>
         </div>
       </section>
+      <section class="card target">
+        <div class="card-head"><div><h2>Cost-to-selling-price calculator</h2><p class="sub">Enter your cost and desired gross margin to calculate the selling price.</p></div><span class="step">4</span></div>
+        <div class="form-body">
+          <div class="seg" role="group" aria-label="Cost price VAT basis"><button id="priceBasisEx" type="button" class="active" aria-pressed="true">Cost ex VAT</button><button id="priceBasisInc" type="button" aria-pressed="false">Cost inc VAT</button></div>
+          <div class="target-grid">
+            <div class="field"><label for="priceCost" id="priceCostLabel">Cost price ex VAT</label><div class="money"><span class="prefix">£</span><input id="priceCost" inputmode="decimal" value="500.00"></div><div class="hint">Enter a cost independently of the deal inputs above</div></div>
+            <div class="field"><label for="priceMargin">Desired gross margin</label><div class="percent"><input id="priceMargin" inputmode="decimal" value="35.00"><span class="suffix">%</span></div><div class="hint">Enter 0% up to (but excluding) 100%</div></div>
+          </div>
+          <div class="target-output" aria-live="polite"><div><div class="label">Selling price inc VAT</div><strong id="priceSellInc">£923.08</strong></div><div class="inc"><span>Selling price ex VAT</span><strong id="priceSellEx">£769.23</strong></div></div>
+          <div class="status" id="priceStatus" role="status">Selling price ex VAT = cost ex VAT ÷ (1 − margin ÷ 100).</div>
+        </div>
+      </section>
     </div>
     <p class="footer-note">Internal buying aid • Values are rounded to the nearest penny • VAT rate is fixed at 20%</p>
   </main>
@@ -70,7 +82,12 @@
       const n=v=>{const x=parseFloat(String(v).replace(/[^0-9.-]/g,''));return Number.isFinite(x)?Math.max(0,x):0}, money=v=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(v), pct=v=>Number.isFinite(v)?v.toFixed(2)+'%':'—';
       function calc(source){if(source==='costEx')els.costInc.value=(n(els.costEx.value)*VAT).toFixed(2);if(source==='costInc')els.costEx.value=(n(els.costInc.value)/VAT).toFixed(2);if(source==='sellEx')els.sellInc.value=(n(els.sellEx.value)*VAT).toFixed(2);if(source==='sellInc')els.sellEx.value=(n(els.sellInc.value)/VAT).toFixed(2);const cx=n(els.costEx.value),sx=n(els.sellEx.value),p=sx-cx,m=sx?p/sx*100:NaN,mu=cx?p/cx*100:NaN;$('profit').textContent=money(p);$('profit').className='value '+(p<0?'negative':'');$('margin').textContent=pct(m);$('margin').className='value '+(m<0?'negative':'');$('markup').textContent=pct(mu);$('markup').className='value '+(mu<0?'negative':'');$('sellVat').textContent=money(sx*.2);$('costVat').textContent=money(cx*.2);$('netVat').textContent=money((sx-cx)*.2);target(cx)}
       function target(currentCost=n(els.costEx.value)){const si=n($('targetSellInc').value),tm=Math.min(99.99,n($('targetMargin').value)),se=si/VAT,max=se*(1-tm/100);$('maxCostEx').textContent=money(max);$('maxCostInc').textContent=money(max*VAT);const d=max-currentCost,st=$('status');if(Math.abs(d)<.005){st.textContent='Your current cost is exactly on target.';st.className='status good'}else if(d>0){st.textContent='Your current cost is '+money(d)+' below the maximum — within target.';st.className='status good'}else{st.textContent='Your current cost is '+money(Math.abs(d))+' above this target.';st.className='status bad'}}
-      Object.entries(els).forEach(([k,e])=>e.addEventListener('input',()=>calc(k)));['targetSellInc','targetMargin'].forEach(id=>$(id).addEventListener('input',()=>target()));$('reset').onclick=()=>{els.costEx.value='500.00';els.costInc.value='600.00';els.sellEx.value='750.00';els.sellInc.value='900.00';$('targetSellInc').value='900.00';$('targetMargin').value='35.00';calc()};calc();
+      let priceBasis='ex';
+      const priceNumber=value=>{const cleaned=String(value).trim().replace(/[£,%\s]/g,'');return cleaned===''?NaN:Number(cleaned)};
+      function sellingPrice(){const cost=priceNumber($('priceCost').value),margin=priceNumber($('priceMargin').value),status=$('priceStatus');let error='';if(!Number.isFinite(cost)||cost<0)error='Enter a valid cost price of £0 or more.';else if(!Number.isFinite(margin)||margin<0||margin>=100)error='Enter a desired gross margin from 0% up to (but excluding) 100%.';const netCost=priceBasis==='inc'?cost/VAT:cost,sell=netCost/(1-margin/100);if(!error&&(!Number.isFinite(sell)||!Number.isFinite(sell*VAT)))error='These values are too large. Enter a smaller cost or margin.';$('priceCost').setAttribute('aria-invalid',String(!Number.isFinite(cost)||cost<0));$('priceMargin').setAttribute('aria-invalid',String(!Number.isFinite(margin)||margin<0||margin>=100));$('priceSellEx').textContent=error?'—':money(sell);$('priceSellInc').textContent=error?'—':money(sell*VAT);status.textContent=error||'Selling price ex VAT = cost ex VAT ÷ (1 − margin ÷ 100).';status.className='status'+(error?' bad':'')}
+      function setPriceBasis(basis){if(basis!==priceBasis){const cost=priceNumber($('priceCost').value);if(Number.isFinite(cost)&&cost>=0)$('priceCost').value=(basis==='inc'?cost*VAT:cost/VAT).toFixed(2)}priceBasis=basis;$('priceCostLabel').textContent='Cost price '+basis+' VAT';['ex','inc'].forEach(b=>{const button=$(b==='ex'?'priceBasisEx':'priceBasisInc');button.classList.toggle('active',b===basis);button.setAttribute('aria-pressed',String(b===basis))});sellingPrice()}
+      ['priceCost','priceMargin'].forEach(id=>$(id).addEventListener('input',sellingPrice));$('priceBasisEx').onclick=()=>setPriceBasis('ex');$('priceBasisInc').onclick=()=>setPriceBasis('inc');sellingPrice();
+      Object.entries(els).forEach(([k,e])=>e.addEventListener('input',()=>calc(k)));['targetSellInc','targetMargin'].forEach(id=>$(id).addEventListener('input',()=>target()));$('reset').onclick=()=>{els.costEx.value='500.00';els.costInc.value='600.00';els.sellEx.value='750.00';els.sellInc.value='900.00';$('targetSellInc').value='900.00';$('targetMargin').value='35.00';setPriceBasis('ex');$('priceCost').value='500.00';$('priceMargin').value='35.00';sellingPrice();calc()};calc();
     })();
   </script>
 </body>
